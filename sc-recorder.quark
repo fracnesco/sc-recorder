@@ -1,0 +1,11 @@
+(
+	name: "BusRecorder",
+	summary: "record any set of buses to disk, and a window to do it from",
+	version: "0.1.0",
+	author: "Francesco Corvi",
+	url: "https://github.com/fracnesco/sc-recorder.git",
+	license: "MIT",
+	copyright: "Copyright (c) 2026 Francesco Corvi",
+	schelp: "HelpSource",
+	dependencies: []
+)

@@ -1,0 +1,305 @@
+TITLE:: BusRecorder
+summary:: record any set of buses to disk, and a window to do it from
+categories:: Libraries>BusRecorder
+related:: Classes/BusRecorderSource, Classes/BusRecorderGUI, Classes/BusManager, Classes/DiskOut
+
+DESCRIPTION::
+A list of sources - buses, by index or by BusManager name - and a way of
+writing them to disk however you ask: one multichannel file, stereo pairs, one
+file per source, one file per channel. Every file in a take starts on the same
+sample.
+
+code::
+s.boot;
+BusRecorder.add(\main, 0, 2);
+BusRecorder.add(\drums, 16, 2);
+BusRecorder.mode = \sources;
+BusRecorder.fileName = "take";
+BusRecorder.record;                  // take_001_main.wav, take_001_drums.wav
+BusRecorder.stop;
+
+BusRecorder.gui;
+::
+
+Everything is on the class: there is one recorder per session, the way there is
+one server, and no instance to keep hold of.
+
+It depends on nothing. When strong::BusManager:: is installed alongside it, a
+source can be added by bus name and follows that name from then on - see
+link::#Sources:: below.
+
+subsection:: Sources
+
+A source is a name and a way of finding a bus. Nothing is ever allocated or
+freed: the recorder only reads, which is what makes it safe to point at
+anything.
+
+table::
+## strong::kind:: || strong::made by:: || strong::found again by::
+## code::\index:: || code::add:: with a number, code::addIndex:: || the index you gave
+## code::\name:: || code::add:: with a symbol, code::addName:: || asking BusManager, whenever its buses change
+## code::\bus:: || code::addBus:: || the Bus itself
+::
+
+code::
+BusRecorder.add(\main, 0, 2);             // a bus index and a channel count
+BusRecorder.addIndex(16, 2);              // the same, named bus16 for you
+BusRecorder.add(\drums);                  // a BusManager name; the source is called drums too
+BusRecorder.add(\kick, \drums, 1);        // the same bus, first channel only
+BusRecorder.addBus(Bus.audio(s, 2));      // a Bus something else made
+::
+
+A source added by name follows it, even in the middle of a take. A name
+BusManager does not know leaves the source in the list but unresolved: it shows
+a code::?:: in the window and is left out of the take until the name turns up.
+
+subsection:: The take
+
+code::mode:: decides how the armed sources' channels are cut into files:
+
+table::
+## strong::mode:: || strong::what you get::
+## code::\single:: || every channel of every source in one multichannel file
+## code::\pairs:: || the same channels, cut into stereo files two at a time
+## code::\sources:: || one file per source, however many channels it has
+## code::\mono:: || one file per channel
+::
+
+A file is named after the take - code::fileName::, then the take number - with
+the sources in it appended: by name, or by bus index when code::label:: is
+code::\index::. A file holding part of a wider source says which part, counting
+from 1: code::take_001_quad_3-4.wav::.
+
+code::
+BusRecorder.nextPaths;      // what the next take would write
+BusRecorder.record;
+BusRecorder.pause;
+BusRecorder.resume;
+BusRecorder.stop;
+BusRecorder.record(30);     // stops itself after thirty seconds
+::
+
+Which sources go in and what they are called is decided when code::record::
+runs; anything changed afterwards is for the next take.
+
+subsection:: Metering and listening
+
+Metering is one small synth per source replying fifteen times a second. It is
+off until something asks for it: opening the window turns it on, closing it
+turns it off again.
+
+code::
+BusRecorder.meter_(true);
+BusRecorder.level(\drums);          // the loudest channel right now
+BusRecorder.at(\drums).levels;      // one per channel
+
+BusRecorder.listen(\drums);         // hear it on the monitor output
+BusRecorder.listenOff;
+::
+
+One source is listened to at a time. Listening to a source that overlaps the
+monitor output is refused rather than played, since that is a feedback loop.
+
+subsection:: Server restarts
+
+After a boot the synth definitions are sent again and every source added by
+name looks its bus up again. cmd-period takes every node, the disk synths
+included: the files are closed so they get their headers, and the post window
+says the take was cut short. If the server itself dies with a take open, the
+files are left without headers.
+
+
+CLASSMETHODS::
+
+METHOD:: add
+Add a source. What code::bus:: is decides how it is found.
+ARGUMENT:: name
+a Symbol. With code::bus:: nil, also the BusManager name to follow.
+ARGUMENT:: bus
+an Integer (a bus index), a Symbol (a BusManager name), a link::Classes/Bus::, or nil.
+ARGUMENT:: channels
+how many channels to record, from the start of the bus. 2 for an index; all of them for a name or a Bus.
+RETURNS:: the link::Classes/BusRecorderSource::.
+
+METHOD:: addIndex
+A bare index and a channel count. Named code::bus16:: and so on unless told otherwise.
+
+METHOD:: addName
+A BusManager name, followed from then on. Kept but unresolved if BusManager does
+not know it, or is not installed.
+
+METHOD:: addBus
+A link::Classes/Bus:: something else made, read where it is. Refused for a control bus.
+
+METHOD:: remove
+Take a source out. Nothing is freed.
+
+METHOD:: rename
+Give a source a different name. Refused if the new name is taken.
+
+METHOD:: arm
+METHOD:: disarm
+METHOD:: isArmed
+Whether a source goes into the next take. A disarmed source stays in the list,
+metered and listenable.
+
+METHOD:: clear
+Empty the list. A take in progress carries on; its files were planned when it started.
+
+METHOD:: at
+The link::Classes/BusRecorderSource:: under a name, or nil.
+
+METHOD:: includes
+Whether a name is in the list.
+
+METHOD:: names
+Every name, in the order they were added.
+
+METHOD:: size
+How many sources there are.
+
+METHOD:: sources
+Every link::Classes/BusRecorderSource::, in order.
+
+METHOD:: record
+Start a take. Every file gets its own disk synth, started in one bundle.
+ARGUMENT:: dur
+seconds after which it stops itself. Nil to record until code::stop::.
+
+METHOD:: stop
+End the take: the synths are freed, then the files closed so they get their
+headers. The post window lists what was written.
+
+METHOD:: pause
+METHOD:: resume
+Hold the disk synths. Nothing is written while paused; the file skips the gap.
+
+METHOD:: recording
+METHOD:: paused
+Whether a take is running, and whether it is held.
+
+METHOD:: duration
+Seconds written so far, or the length of the last take.
+
+METHOD:: files
+The paths of the take in progress, or the last one.
+
+METHOD:: plan
+Which channels go into which file: a list of files, each a list of
+code::[source, channel]:: pairs. Only armed, resolved sources take part.
+
+METHOD:: nextPaths
+The files the next take would write, so you can check before you press.
+
+METHOD:: nextTake
+The take number the next take gets: one more than the highest in the folder under this name.
+
+METHOD:: mode
+How a take is split into files: code::\single::, code::\pairs::, code::\sources:: or code::\mono::. code::\single:: by default.
+
+METHOD:: label
+What a file is labelled with: code::\name::, the source's name, or code::\index::, the index of its bus as code::bus16::. code::\name:: by default.
+
+METHOD:: numbering
+code::\take:: for a three digit take number, code::\timestamp:: for the date and time, code::\none:: for neither - and the next take overwrites. code::\take:: by default.
+
+METHOD:: fileName
+The first part of every file name. code::"rec":: by default, and when set to nothing.
+
+METHOD:: dir
+Where the files go. SuperCollider's own recordings folder unless set. Made when the first take starts.
+
+METHOD:: headerFormat
+code::"wav"::, code::"aiff"::, or code::"caf"::. code::"wav":: by default.
+
+METHOD:: sampleFormat
+code::"int16"::, code::"int24"::, or code::"float"::. code::"int24":: by default.
+
+METHOD:: bufSize
+Frames of disk buffer per file, as link::Classes/Server#-recBufSize::. 65536 by default.
+
+METHOD:: level
+The loudest channel of a source right now. 0 unless metering is on.
+
+METHOD:: meter
+Whether the meters are running. Off by default; the window turns it on while it is open.
+
+METHOD:: listen
+Route one source to the monitor output so you can hear it. Starting another
+stops the first. Refused for an unresolved source, and for one overlapping the
+monitor output.
+
+METHOD:: listenOff
+Stop listening.
+
+METHOD:: isListeningTo
+Whether that name is the one being listened to.
+
+METHOD:: monitoring
+The source being listened to, or nil.
+
+METHOD:: monitorOut
+Where listening goes. 0 by default. Moving it onto the source being listened to stops the monitor rather than making a loop.
+
+METHOD:: monitorAmp
+Monitor level, 0 to 2. 0.5 by default.
+
+METHOD:: saveLayout
+METHOD:: loadLayout
+The sources and every setting, written to one code::.scd:: file and read back.
+A bare name lands in the repository's code::layouts:: folder. Loading replaces
+everything. Nothing is ever restored automatically.
+
+METHOD:: layouts
+The layout files on disk, newest first - what the window's dropdown offers.
+
+METHOD:: layoutDir
+Where they live.
+
+METHOD:: server
+The server the sources are read on. link::Classes/Server::.default unless set.
+Setting it stops a take and empties the list.
+
+METHOD:: gui
+Open the window, or bring it to the front. link::Classes/BusRecorderGUI::.
+
+METHOD:: meterRate
+How many times a second a meter reports. 15.
+
+
+EXAMPLES::
+
+code::
+s.boot;
+
+// two sources, and a window to watch them in
+BusRecorder.add(\main, 0, 2);
+BusRecorder.add(\side, 2, 2);
+BusRecorder.gui;
+
+// something to look at
+~noise = { Out.ar(2, PinkNoise.ar(0.1) ! 2) }.play;
+
+BusRecorder.level(\side);       // moving
+BusRecorder.listen(\side);      // and now audible
+BusRecorder.listenOff;
+
+// how the take is written
+BusRecorder.fileName = "demo";
+BusRecorder.mode = \sources;
+BusRecorder.nextPaths;          // demo_001_main.wav, demo_001_side.wav
+
+// a take
+BusRecorder.record(5);          // stops itself
+BusRecorder.files;
+
+~noise.free;
+
+// save the lot, and get it back
+BusRecorder.saveLayout("tonight");
+BusRecorder.clear;
+BusRecorder.loadLayout("tonight");
+::
+
+There is a longer walkthrough in code::examples/bus-recorder-demo.scd:: in the
+repository.

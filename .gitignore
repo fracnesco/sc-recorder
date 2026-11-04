@@ -1,0 +1,9 @@
+.DS_Store
+
+# layouts are yours, not the repository's
+layouts/*
+!layouts/.gitkeep
+
+# local working notes, not for the repository
+ECOSYSTEM.md
+CLAUDE.md
