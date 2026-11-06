@@ -631,7 +631,7 @@ BusRecorder {
 
 	*layoutPath { |name|
 		var p = name.asString;
-		if (p.contains("/").not) { p = this.layoutDir +/+ p };
+		if (p.contains("/").not and: { p.contains("\\").not }) { p = this.layoutDir +/+ p };
 		p = p.standardizePath;
 		if (PathName(p).extension.isEmpty and: { File.exists(p).not }) { p = p ++ ".scd" };
 		^p
@@ -640,7 +640,7 @@ BusRecorder {
 	// what the window's dropdown offers: everything in the folder, newest first
 	*layouts {
 		^(this.layoutDir +/+ "*").pathMatch.select { |p|
-			p.endsWith("/").not and: { PathName(p).fileName.beginsWith(".").not }
+			p.last.isPathSeparator.not and: { PathName(p).fileName.beginsWith(".").not }
 		}.sort { |a, b| File.mtime(a) > File.mtime(b) }
 	}
 
